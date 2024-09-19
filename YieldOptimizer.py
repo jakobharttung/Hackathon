@@ -28,7 +28,7 @@ def clean_and_validate_data(df, yield_column, manufacture_date_column):
 # Function to select and clean features for machine learning
 def select_and_clean_features(df):
     # Select columns between 'quantity' and 'fet_3_1a_initial_ph'
-    feature_columns = df.loc[:, 'campaign_id':'fet_3_1a_initial_ph']
+    feature_columns = df.loc[:, 'quantity':'fet_3_1a_initial_ph']
 
     # Drop columns with non-numeric values or only one unique value
     numeric_features = feature_columns.apply(pd.to_numeric, errors='coerce')
@@ -56,9 +56,10 @@ def suggest_optimal_ranges(df, top_features, shap_values):
         # Full range of the feature in the dataset
         full_range = (df[feature].min(), df[feature].max())
         
-        # Constrained range based on SHAP values: filter by high-impact values
-        high_impact_indices = np.where(np.abs(shap_values[:, top_features.index(feature)]) > 0.5)[0]
-        constrained_range = (df.loc[high_impact_indices, feature].min(), df.loc[high_impact_indices, feature].max())
+        # Constrained range based on SHAP values
+        feature_idx = list(top_features).index(feature)
+        high_impact_indices = np.where(np.abs(shap_values[:, feature_idx]) > 0.5)[0]
+        constrained_range = (df.iloc[high_impact_indices][feature].min(), df.iloc[high_impact_indices][feature].max())
 
         # Display the ranges
         st.write(f"**{feature}:**")
@@ -115,9 +116,10 @@ if uploaded_file is not None:
     st.pyplot(fig)
 
     # --- Correlation Matrix ---
-    st.write("### Correlation Matrix")
+    top_features_for_corr = selected_features[:10]  # Select top 10 features for readability
+    st.write("### Correlation Matrix (Top 10 Features)")
     fig, ax = plt.subplots(figsize=(10,8))
-    corr_matrix = df_cleaned[selected_features + [yield_column]].corr()
+    corr_matrix = df_cleaned[top_features_for_corr + [yield_column]].corr()
     sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', ax=ax)
     st.pyplot(fig)
 
@@ -144,35 +146,4 @@ if uploaded_file is not None:
     st.write(f"R² Score: {r2:.4f}")
 
     # --- Feature Importance ---
-    st.write("### Feature Importance")
-    feature_importance = pd.DataFrame({'Feature': selected_features + [manufacture_date_column], 'Importance': model.feature_importances_})
-    feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
-
-    fig, ax = plt.subplots()
-    sns.barplot(x='Importance', y='Feature', data=feature_importance, ax=ax)
-    ax.set_title('Feature Importance')
-    st.pyplot(fig)
-
-    # --- SHAP values for interpretability ---
-    st.write("### SHAP Analysis (Top 5 Features)")
-    
-    try:
-        # Ensure SHAP values are calculated for strictly numeric input
-        X_test = X_test.astype(np.float64)
-
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(X_test)
-
-        shap.initjs()
-        shap.summary_plot(shap_values, X_test, feature_names=selected_features + [manufacture_date_column], max_display=5, plot_type="bar")
-        st.pyplot(bbox_inches='tight')
-
-        # Suggest optimal ranges for the top 5 features
-        top_features = feature_importance['Feature'].head(5).values
-        suggest_optimal_ranges(df_cleaned, top_features, shap_values)
-
-    except Exception as e:
-        st.error(f"Error generating SHAP values: {e}")
-
-else:
-    st.write("Please upload a dataset to begin analysis.")
+    top_features_for_importance = selected_features[:10]  # Limit to top 
