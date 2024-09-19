@@ -41,7 +41,7 @@ def prepare_features(df, selected_features, yield_column):
     
     return X, y
 
-# Function to suggest optimal ranges for the top 5 features
+# Function to suggest optimal ranges for the top features
 def suggest_optimal_ranges(df, top_features, shap_values):
     st.write("### Suggested Parameter Ranges for Yield Improvement")
 
@@ -149,7 +149,7 @@ if uploaded_file is not None:
     st.pyplot(fig)
 
     # --- SHAP values for interpretability ---
-    st.write("### SHAP Analysis (Top 5 Features)")
+    st.write("### SHAP Analysis (Top Features)")
     
     try:
         # Ensure SHAP values are calculated for strictly numeric input
@@ -158,12 +158,16 @@ if uploaded_file is not None:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(X_test)
 
+        # Dynamically select top features based on availability
+        num_top_features = min(5, len(selected_features))  # Use as many features as possible, up to 5
+        top_features_for_shap = selected_features[:num_top_features]
+
         shap.initjs()
-        shap.summary_plot(shap_values, X_test, feature_names=selected_features[:5], max_display=5, plot_type="bar")
+        shap.summary_plot(shap_values, X_test, feature_names=top_features_for_shap, max_display=num_top_features, plot_type="bar")
         st.pyplot(bbox_inches='tight')
 
-        # Suggest optimal ranges for the top 5 features
-        top_features = feature_importance['Feature'].head(5).values
+        # Suggest optimal ranges for the top features
+        top_features = feature_importance['Feature'].head(num_top_features).values
         suggest_optimal_ranges(df_cleaned, top_features, shap_values)
 
     except Exception as e:
