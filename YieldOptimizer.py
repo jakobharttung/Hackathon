@@ -7,21 +7,17 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import shap
 import numpy as np
-from datetime import datetime
 
 # Set page title
 st.title('Yield Optimization Dashboard')
 
 # Function to clean and validate data
-def clean_and_validate_data(df, yield_column, manufacture_date_column):
+def clean_and_validate_data(df, yield_column):
     # Ensure that the yield column is numeric
     df[yield_column] = pd.to_numeric(df[yield_column], errors='coerce')
-    
-    # Convert integer timestamp to datetime
-    df[manufacture_date_column] = pd.to_datetime(df[manufacture_date_column], unit='s', errors='coerce')
 
-    # Drop rows where yield or manufacture date is NaN
-    df_cleaned = df.dropna(subset=[yield_column, manufacture_date_column])
+    # Drop rows where yield is NaN
+    df_cleaned = df.dropna(subset=[yield_column])
     
     return df_cleaned
 
@@ -39,8 +35,8 @@ def select_and_clean_features(df):
 
 # Function to prepare features for machine learning
 def prepare_features(df, selected_features, yield_column):
-        # Prepare the cleaned dataset for machine learning (excluding yield_value)
-    X = df[selected_features ]  # Features 
+    # Prepare the cleaned dataset for machine learning (excluding yield_value)
+    X = df[selected_features]  # Selected features
     y = df[yield_column]  # Target
     
     return X, y
@@ -76,12 +72,11 @@ if uploaded_file is not None:
         st.error(f"Error reading CSV file: {e}")
         st.stop()
 
-    # Automatically set yield column and manufacture date column
+    # Automatically set yield column
     yield_column = 'yield_value'
-    manufacture_date_column = 'manufacture_date'
 
     # Clean and validate data
-    df_cleaned = clean_and_validate_data(df, yield_column, manufacture_date_column)
+    df_cleaned = clean_and_validate_data(df, yield_column)
     
     # If the dataset is empty after cleansing, show an error
     if df_cleaned.empty:
@@ -113,17 +108,16 @@ if uploaded_file is not None:
     st.pyplot(fig)
 
     # --- Correlation Matrix ---
-    top_features_for_corr = selected_features[:10]  # Select top 10 features for readability
-    st.write("### Correlation Matrix (Top 10 Features)")
+    st.write("### Correlation Matrix")
     fig, ax = plt.subplots(figsize=(10,8))
-    corr_matrix = df_cleaned[top_features_for_corr + [yield_column]].corr()
+    corr_matrix = df_cleaned[selected_features + [yield_column]].corr()  # Include yield_value in the correlation matrix
     sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', ax=ax)
     st.pyplot(fig)
 
     # --- Machine Learning Model ---
     st.write("### Machine Learning: Yield Prediction")
     
-    # Prepare features for machine learning, including manufacture date
+    # Prepare features for machine learning
     X, y = prepare_features(df_cleaned, selected_features, yield_column)
 
     # Split data into train and test sets
@@ -143,4 +137,36 @@ if uploaded_file is not None:
     st.write(f"R² Score: {r2:.4f}")
 
     # --- Feature Importance ---
-    top_features_for_importance = selected_features[:10]  # Limit to top 
+    top_features_for_importance = selected_features[:10]  # Limit to top 10 features for readability
+    st.write("### Feature Importance (Top 10 Features)")
+    feature_importance = pd.DataFrame({'Feature': top_features_for_importance, 'Importance': model.feature_importances_})
+    feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
+
+    fig, ax = plt.subplots()
+    sns.barplot(x='Importance', y='Feature', data=feature_importance, ax=ax)
+    ax.set_title('Feature Importance')
+    st.pyplot(fig)
+
+    # --- SHAP values for interpretability ---
+    st.write("### SHAP Analysis (Top 5 Features)")
+    
+    try:
+        # Ensure SHAP values are calculated for strictly numeric input
+        X_test = X_test.astype(np.float64)
+
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(X_test)
+
+        shap.initjs()
+        shap.summary_plot(shap_values, X_test, feature_names=selected_features, max_display=5, plot_type="bar")
+        st.pyplot(bbox_inches='tight')
+
+        # Suggest optimal ranges for the top 5 features
+        top_features = feature_importance['Feature'].head(5).values
+        suggest_optimal_ranges(df_cleaned, top_features, shap_values)
+
+    except Exception as e:
+        st.error(f"Error generating SHAP values: {e}")
+
+else:
+    st.write("Please upload a dataset to begin analysis.")
