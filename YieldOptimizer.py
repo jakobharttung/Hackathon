@@ -10,6 +10,20 @@ import shap
 # Set page title
 st.title('Yield Optimization Dashboard')
 
+# Function to prepare the features for the model
+def prepare_features(df, features, yield_column):
+    # Ensure only numeric columns are passed for features
+    df[features] = df[features].apply(pd.to_numeric, errors='coerce')  # Convert to numeric, coerce invalids to NaN
+    df[yield_column] = pd.to_numeric(df[yield_column], errors='coerce')  # Ensure yield column is numeric
+    
+    # Drop rows with NaN values in the selected features and yield column
+    df_cleaned = df.dropna(subset=features + [yield_column])
+    
+    X = df_cleaned[features]  # Features
+    y = df_cleaned[yield_column]  # Target
+    
+    return X, y
+
 # Upload CSV file
 st.sidebar.title("Upload CSV Dataset")
 uploaded_file = st.sidebar.file_uploader("Choose a CSV file", type=["csv"])
@@ -87,13 +101,8 @@ if uploaded_file is not None:
     # --- Machine Learning Model ---
     st.write("### Machine Learning: Yield Prediction")
     
-    # Ensure only numeric columns are used for training the model
-    X = df[features].apply(pd.to_numeric, errors='coerce')  # Convert columns to numeric, invalid parsing will be NaN
-    y = df[yield_column].apply(pd.to_numeric, errors='coerce')  # Ensure the target column is numeric
-
-    # Drop rows with NaN values resulting from invalid conversions
-    X = X.dropna()
-    y = y[X.index]  # Ensure target variable has the same index as features
+    # Prepare the features and target variable using the custom function
+    X, y = prepare_features(df, features, yield_column)
 
     # Split data into train and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
