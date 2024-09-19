@@ -168,6 +168,7 @@ if uploaded_file is not None:
         st.write("shap plot")
 
         shap.summary_plot(shap_values, X_test, feature_names=top_features_for_shap, max_display=num_top_features, plot_type="bar")
+        st.write("pyplot")
         st.pyplot(bbox_inches='tight')
 
         # Suggest optimal ranges for the top features
