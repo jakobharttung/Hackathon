@@ -5,7 +5,6 @@ import seaborn as sns
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
-import shap
 import numpy as np
 
 # Set page title
@@ -41,23 +40,27 @@ def prepare_features(df, selected_features, yield_column):
     
     return X, y
 
-# Function to suggest optimal ranges for the top features
-def suggest_optimal_ranges(df, top_features, shap_values):
-    st.write("### Suggested Parameter Ranges for Yield Improvement")
+# Function to recommend parameter ranges based on yield bins
+def recommend_parameter_ranges(df, top_features, yield_column):
+    st.write("### Recommended Parameter Ranges for Yield Improvement")
 
     for feature in top_features:
-        # Full range of the feature in the dataset
-        full_range = (df[feature].min(), df[feature].max())
+        # Bin the feature values into quartiles
+        df['feature_bin'] = pd.qcut(df[feature], 4)  # Create 4 bins (quartiles)
         
-        # Constrained range based on SHAP values
-        feature_idx = list(top_features).index(feature)
-        high_impact_indices = np.where(np.abs(shap_values[:, feature_idx]) > 0.5)[0]
-        constrained_range = (df.iloc[high_impact_indices][feature].min(), df.iloc[high_impact_indices][feature].max())
-
-        # Display the ranges
+        # Calculate the average yield for each bin
+        bin_summary = df.groupby('feature_bin')[yield_column].mean().reset_index()
+        
+        # Find the bin with the highest average yield
+        best_bin = bin_summary.loc[bin_summary[yield_column].idxmax()]
+        best_range = best_bin['feature_bin']
+        
+        # Display the optimal range for this feature
         st.write(f"**{feature}:**")
-        st.write(f"Full range in dataset: {full_range}")
-        st.write(f"Suggested range for most yield impact: {constrained_range}")
+        st.write(f"Optimal range: {best_range} (delivers highest average yield)")
+
+    # Drop the temporary 'feature_bin' column after analysis
+    df.drop(columns=['feature_bin'], inplace=True)
 
 # Upload CSV file
 st.sidebar.title("Upload CSV Dataset")
@@ -148,35 +151,9 @@ if uploaded_file is not None:
     ax.set_title('Feature Importance')
     st.pyplot(fig)
 
-    # --- SHAP values for interpretability ---
-    st.write("### SHAP Analysis (Top Features)")
-    
-    try:
-        # Ensure SHAP values are calculated for strictly numeric input
-        X_test = X_test.astype(np.float64)
-
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(X_test)
-
-        # Handle SHAP values in case of a list (like in RandomForest)
-        if isinstance(shap_values, list):
-            shap_values = shap_values[0]  # Take the first array, typically for regression problems
-
-        # Dynamically select top features based on the number of features used in the model
-        num_features_in_shap = shap_values.shape[1]  # Get the number of features from SHAP values
-        num_top_features = min(5, num_features_in_shap)  # Use as many features as possible, up to 5
-        top_features_for_shap = selected_features[:num_top_features]
-
-        shap.initjs()
-        shap.summary_plot(shap_values, X_test, feature_names=top_features_for_shap, max_display=num_top_features, plot_type="bar")
-        st.pyplot(bbox_inches='tight')
-
-        # Suggest optimal ranges for the top features
-        top_features = feature_importance['Feature'].head(num_top_features).values
-        suggest_optimal_ranges(df_cleaned, top_features, shap_values)
-
-    except Exception as e:
-        st.error(f"Error generating SHAP values: {e}")
+    # --- Recommend Parameter Ranges ---
+    top_features = feature_importance['Feature'].head(5).values
+    recommend_parameter_ranges(df_cleaned, top_features, yield_column)
 
 else:
     st.write("Please upload a dataset to begin analysis.")
