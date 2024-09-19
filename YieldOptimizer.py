@@ -127,11 +127,7 @@ if uploaded_file is not None:
         st.error("No valid features available after cleaning. Please check the dataset and try again.")
         st.stop()
 
-    # Display the cleaned dataset
-    st.write("### Cleaned Dataset Preview")
-    st.dataframe(df_cleaned.head())
-
-    # --- Data Overview ---
+        # --- Data Overview ---
     st.write("### Data Overview")
     st.write(f"Total records: {df_cleaned.shape[0]}")
     st.write(f"Total features: {df_cleaned.shape[1]}")
