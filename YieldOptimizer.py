@@ -48,9 +48,9 @@ if uploaded_file is not None:
         st.error(f"Error reading CSV file: {e}")
         st.stop()
 
-    # Select yield column and features to analyze
-    yield_column = st.sidebar.selectbox("Select Yield Column", df.columns)
-    manufacture_date_column = 'manufacture_date'  # Assuming manufacture_date is the correct column name
+    # Automatically select yield column
+    yield_column = 'yield_value'
+    manufacture_date_column = 'manufacture_date'
 
     # Clean and validate data
     df_cleaned = clean_and_validate_data(df, yield_column, manufacture_date_column)
@@ -71,7 +71,7 @@ if uploaded_file is not None:
 
     # Filter numeric features for machine learning
     numeric_columns = df_cleaned.select_dtypes(include=['float64', 'int64']).columns
-    features = st.sidebar.multiselect("Select Features to Analyze", numeric_columns, default=numeric_columns)
+    selected_features = st.sidebar.multiselect("Select Features for Correlation Matrix", numeric_columns, default=numeric_columns[:10])
 
     # --- Visualization ---
     st.write("### Yield Distribution")
@@ -80,30 +80,26 @@ if uploaded_file is not None:
     ax.set_title('Yield Distribution')
     st.pyplot(fig)
 
-    # --- Variability in Yield using Scatter Plot with Months ---
+    # --- Variability in Yield using Scatter Plot with Day of the Month ---
     st.write("### Variability in Yield")
     fig, ax = plt.subplots()
-    df_cleaned['month'] = df_cleaned[manufacture_date_column].dt.month  # Extract month as a number
-    ax.scatter(df_cleaned['month'], df_cleaned[yield_column])
-
-    # Customize the x-axis to show only months
-    ax.set_xticks(range(1, 13))
-    ax.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
+    df_cleaned['day'] = df_cleaned[manufacture_date_column].dt.day  # Extract day of the month
+    ax.scatter(df_cleaned['day'], df_cleaned[yield_column])
 
     # Set custom y-axis limits
     lower_bound = df_cleaned[yield_column].quantile(0.05)  # 5th percentile
     upper_bound = df_cleaned[yield_column].quantile(0.95)  # 95th percentile
     ax.set_ylim([lower_bound, upper_bound])  # Set y-axis limits
 
-    ax.set_xlabel('Month')
+    ax.set_xlabel('Day of the Month')
     ax.set_ylabel('Yield')
-    ax.set_title('Yield Variability Over Months')
+    ax.set_title('Yield Variability Over Days of the Month')
     st.pyplot(fig)
 
     # --- Correlation Matrix ---
     st.write("### Correlation Matrix")
     fig, ax = plt.subplots(figsize=(10,8))
-    corr_matrix = df_cleaned[features + [yield_column]].corr()
+    corr_matrix = df_cleaned[selected_features + [yield_column]].corr()
     sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', ax=ax)
     st.pyplot(fig)
 
@@ -111,7 +107,7 @@ if uploaded_file is not None:
     st.write("### Machine Learning: Yield Prediction")
     
     # Prepare features for machine learning, including manufacture date
-    X, y = prepare_features(df_cleaned, features, yield_column, manufacture_date_column)
+    X, y = prepare_features(df_cleaned, selected_features, yield_column, manufacture_date_column)
 
     # Split data into train and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -131,7 +127,7 @@ if uploaded_file is not None:
 
     # --- Feature Importance ---
     st.write("### Feature Importance")
-    feature_importance = pd.DataFrame({'Feature': features + [manufacture_date_column], 'Importance': model.feature_importances_})
+    feature_importance = pd.DataFrame({'Feature': selected_features + [manufacture_date_column], 'Importance': model.feature_importances_})
     feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
 
     fig, ax = plt.subplots()
@@ -150,7 +146,7 @@ if uploaded_file is not None:
         shap_values = explainer.shap_values(X_test)
 
         shap.initjs()
-        shap.summary_plot(shap_values, X_test, feature_names=features + [manufacture_date_column], max_display=5, plot_type="bar")
+        shap.summary_plot(shap_values, X_test, feature_names=selected_features + [manufacture_date_column], max_display=5, plot_type="bar")
         st.pyplot(bbox_inches='tight')
     except Exception as e:
         st.error(f"Error generating SHAP values: {e}")
