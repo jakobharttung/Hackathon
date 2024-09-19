@@ -156,8 +156,11 @@ if uploaded_file is not None:
         X_test = X_test.astype(np.float64)
 
         explainer = shap.TreeExplainer(model)
-        
         shap_values = explainer.shap_values(X_test)
+
+        # Handle SHAP values in case of a list (like in RandomForest)
+        if isinstance(shap_values, list):
+            shap_values = shap_values[0]  # Take the first array, typically for regression problems
 
         # Dynamically select top features based on the number of features used in the model
         num_features_in_shap = shap_values.shape[1]  # Get the number of features from SHAP values
@@ -165,16 +168,11 @@ if uploaded_file is not None:
         top_features_for_shap = selected_features[:num_top_features]
 
         shap.initjs()
-        st.write("shap plot")
-
         shap.summary_plot(shap_values, X_test, feature_names=top_features_for_shap, max_display=num_top_features, plot_type="bar")
-        st.write("pyplot")
         st.pyplot(bbox_inches='tight')
 
         # Suggest optimal ranges for the top features
-        st.write("top features")
         top_features = feature_importance['Feature'].head(num_top_features).values
-        st.write("optimal ranges")
         suggest_optimal_ranges(df_cleaned, top_features, shap_values)
 
     except Exception as e:
