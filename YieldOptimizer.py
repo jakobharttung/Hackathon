@@ -27,8 +27,8 @@ def clean_and_validate_data(df, yield_column, manufacture_date_column):
 
 # Function to select and clean features for machine learning
 def select_and_clean_features(df):
-    # Select columns between 'quantity' and 'output_batch_xa_tel'
-    feature_columns = df.loc[:, 'quantity':'output_batch_xa_tel']
+    # Select columns between 'quantity' and 'fet_3_1a_initial_ph'
+    feature_columns = df.loc[:, 'quantity':'fet_3_1a_initial_ph']
 
     # Drop columns with non-numeric values or only one unique value
     numeric_features = feature_columns.apply(pd.to_numeric, errors='coerce')
@@ -47,6 +47,23 @@ def prepare_features(df, selected_features, yield_column, manufacture_date_colum
     y = df[yield_column]  # Target
     
     return X, y
+
+# Function to suggest optimal ranges for the top 5 features
+def suggest_optimal_ranges(df, top_features, shap_values):
+    st.write("### Suggested Parameter Ranges for Yield Improvement")
+
+    for feature in top_features:
+        # Full range of the feature in the dataset
+        full_range = (df[feature].min(), df[feature].max())
+        
+        # Constrained range based on SHAP values: filter by high-impact values
+        high_impact_indices = np.where(np.abs(shap_values[:, top_features.index(feature)]) > 0.5)[0]
+        constrained_range = (df.loc[high_impact_indices, feature].min(), df.loc[high_impact_indices, feature].max())
+
+        # Display the ranges
+        st.write(f"**{feature}:**")
+        st.write(f"Full range in dataset: {full_range}")
+        st.write(f"Suggested range for most yield impact: {constrained_range}")
 
 # Upload CSV file
 st.sidebar.title("Upload CSV Dataset")
@@ -149,19 +166,13 @@ if uploaded_file is not None:
         shap.initjs()
         shap.summary_plot(shap_values, X_test, feature_names=selected_features + [manufacture_date_column], max_display=5, plot_type="bar")
         st.pyplot(bbox_inches='tight')
+
+        # Suggest optimal ranges for the top 5 features
+        top_features = feature_importance['Feature'].head(5).values
+        suggest_optimal_ranges(df_cleaned, top_features, shap_values)
+
     except Exception as e:
         st.error(f"Error generating SHAP values: {e}")
-
-    # --- Parameter Optimization ---
-    st.write("### Suggested Parameter Ranges for Yield Improvement")
-    
-    top_features = feature_importance['Feature'].head(5).values
-    st.write(f"Top 5 parameters driving yield: {', '.join(top_features)}")
-
-    st.write("Based on SHAP analysis, adjusting these parameters could lead to yield improvements. Here is a detailed analysis of optimal ranges and expected yield improvements:")
-
-    for feature in top_features:
-        st.write(f"**{feature}:** Adjust the range between X and Y (replace X and Y with specific values from analysis) to potentially increase yield by Z%.")
 
 else:
     st.write("Please upload a dataset to begin analysis.")
