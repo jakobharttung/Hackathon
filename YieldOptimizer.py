@@ -43,7 +43,9 @@ def prepare_features(df, selected_features, yield_column):
 # Function to recommend parameter ranges based on yield bins
 def recommend_parameter_ranges(df, top_features, yield_column):
     st.write("### Recommended Parameter Ranges for Yield Improvement")
-
+    
+    optimal_ranges = {}
+    
     for feature in top_features:
         # Bin the feature values into quartiles
         df['feature_bin'] = pd.qcut(df[feature], 4)  # Create 4 bins (quartiles)
@@ -55,12 +57,43 @@ def recommend_parameter_ranges(df, top_features, yield_column):
         best_bin = bin_summary.loc[bin_summary[yield_column].idxmax()]
         best_range = best_bin['feature_bin']
         
+        # Store the optimal range for this feature
+        optimal_ranges[feature] = best_range
+        
         # Display the optimal range for this feature
         st.write(f"**{feature}:**")
         st.write(f"Optimal range: {best_range} (delivers highest average yield)")
 
     # Drop the temporary 'feature_bin' column after analysis
     df.drop(columns=['feature_bin'], inplace=True)
+    
+    return optimal_ranges
+
+# Function to visualize yield improvement
+def visualize_yield_improvement(df, optimal_ranges, top_features, yield_column):
+    st.write("### Yield Improvement Visualization")
+
+    # Calculate current average yield
+    current_avg_yield = df[yield_column].mean()
+
+    # Filter data within the suggested parameter ranges
+    filtered_df = df.copy()
+    for feature, optimal_range in optimal_ranges.items():
+        filtered_df = filtered_df[filtered_df[feature].between(optimal_range.left, optimal_range.right)]
+    
+    # Calculate yield with suggested ranges
+    if not filtered_df.empty:
+        suggested_avg_yield = filtered_df[yield_column].mean()
+    else:
+        suggested_avg_yield = current_avg_yield  # If no data points match, use current avg
+
+    # Visualize the comparison
+    fig, ax = plt.subplots()
+    ax.bar(['Current Average Yield', 'Yield with Suggested Ranges'], [current_avg_yield, suggested_avg_yield], color=['blue', 'green'])
+    ax.set_ylabel('Yield')
+    ax.set_title('Yield Improvement with Suggested Ranges')
+    
+    st.pyplot(fig)
 
 # Upload CSV file
 st.sidebar.title("Upload CSV Dataset")
@@ -153,7 +186,10 @@ if uploaded_file is not None:
 
     # --- Recommend Parameter Ranges ---
     top_features = feature_importance['Feature'].head(5).values
-    recommend_parameter_ranges(df_cleaned, top_features, yield_column)
+    optimal_ranges = recommend_parameter_ranges(df_cleaned, top_features, yield_column)
+
+    # --- Visualize Yield Improvement ---
+    visualize_yield_improvement(df_cleaned, optimal_ranges, top_features, yield_column)
 
 else:
     st.write("Please upload a dataset to begin analysis.")
