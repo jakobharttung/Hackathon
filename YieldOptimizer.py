@@ -23,6 +23,13 @@ if uploaded_file is not None:
         st.error(f"Error reading CSV file: {e}")
         st.stop()
 
+    # Convert manufacture_date to datetime if it exists in the dataset
+    if 'manufacture_date' in df.columns:
+        try:
+            df['manufacture_date'] = pd.to_datetime(df['manufacture_date'], errors='coerce')
+        except Exception as e:
+            st.warning("Error converting 'manufacture_date' to datetime")
+
     # Show a preview of the dataset
     st.write("### Dataset Preview")
     st.dataframe(df.head())
@@ -34,7 +41,10 @@ if uploaded_file is not None:
 
     # Select yield column and features to analyze
     yield_column = st.sidebar.selectbox("Select Yield Column", df.columns)
-    features = st.sidebar.multiselect("Select Features to Analyze", df.columns, default=df.columns[:-1])
+    
+    # Filter numeric features for machine learning
+    numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
+    features = st.sidebar.multiselect("Select Features to Analyze", numeric_columns, default=numeric_columns)
 
     # --- Visualization ---
     st.write("### Yield Distribution")
@@ -43,12 +53,19 @@ if uploaded_file is not None:
     ax.set_title('Yield Distribution')
     st.pyplot(fig)
 
+    # --- Variability in Yield using Scatter Plot ---
     st.write("### Variability in Yield")
-    fig, ax = plt.subplots()
-    sns.boxplot(df[yield_column], ax=ax)
-    ax.set_title('Yield Variability')
-    st.pyplot(fig)
+    if 'manufacture_date' in df.columns:
+        fig, ax = plt.subplots()
+        ax.scatter(df['manufacture_date'], df[yield_column])
+        ax.set_xlabel('Manufacture Date')
+        ax.set_ylabel('Yield')
+        ax.set_title('Yield Variability Over Time')
+        st.pyplot(fig)
+    else:
+        st.warning("Manufacture Date column is not available for plotting")
 
+    # --- Correlation Matrix ---
     st.write("### Correlation Matrix")
     fig, ax = plt.subplots(figsize=(10,8))
     corr_matrix = df[features + [yield_column]].corr()
@@ -77,7 +94,7 @@ if uploaded_file is not None:
     st.write(f"Mean Absolute Error: {mae:.4f}")
     st.write(f"R² Score: {r2:.4f}")
 
-    # Feature Importance
+    # --- Feature Importance ---
     st.write("### Feature Importance")
     feature_importance = pd.DataFrame({'Feature': features, 'Importance': model.feature_importances_})
     feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
