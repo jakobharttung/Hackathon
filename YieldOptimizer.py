@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import shap
 import numpy as np
+from datetime import datetime
 
 # Set page title
 st.title('Yield Optimization Dashboard')
@@ -16,8 +17,8 @@ def clean_and_validate_data(df, yield_column, manufacture_date_column):
     # Ensure that the yield column is numeric
     df[yield_column] = pd.to_numeric(df[yield_column], errors='coerce')
     
-    # Convert manufacture date to datetime
-    df[manufacture_date_column] = pd.to_datetime(df[manufacture_date_column], errors='coerce')
+    # Convert integer timestamp to datetime
+    df[manufacture_date_column] = pd.to_datetime(df[manufacture_date_column], unit='s', errors='coerce')
 
     # Drop rows where yield or manufacture date is NaN
     df_cleaned = df.dropna(subset=[yield_column, manufacture_date_column])
@@ -48,7 +49,7 @@ if uploaded_file is not None:
         st.error(f"Error reading CSV file: {e}")
         st.stop()
 
-    # Automatically select yield column
+    # Automatically set yield column and manufacture date column
     yield_column = 'yield_value'
     manufacture_date_column = 'manufacture_date'
 
@@ -91,9 +92,13 @@ if uploaded_file is not None:
     upper_bound = df_cleaned[yield_column].quantile(0.95)  # 95th percentile
     ax.set_ylim([lower_bound, upper_bound])  # Set y-axis limits
 
-    ax.set_xlabel('Day of the Month')
+    # Limit x-axis to January (days 1 to 31)
+    ax.set_xlim([1, 31])
+    ax.set_xticks(range(1, 32))
+
+    ax.set_xlabel('Day of the Month (January)')
     ax.set_ylabel('Yield')
-    ax.set_title('Yield Variability Over Days of the Month')
+    ax.set_title('Yield Variability Over Days of January')
     st.pyplot(fig)
 
     # --- Correlation Matrix ---
