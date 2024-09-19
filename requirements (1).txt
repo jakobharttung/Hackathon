@@ -1,0 +1,10 @@
+altair
+pandas
+matplotlib
+seaborn
+streamlit
+openpyxl
+pygwalker
+yfinance
+plotly
+mplfinance
