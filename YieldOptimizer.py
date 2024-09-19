@@ -154,14 +154,19 @@ if uploaded_file is not None:
     try:
         # Ensure SHAP values are calculated for strictly numeric input
         X_test = X_test.astype(np.float64)
+        st.write("Tree explainer")
 
         explainer = shap.TreeExplainer(model)
+        
+        st.write("explainer")
         shap_values = explainer.shap_values(X_test)
 
         # Dynamically select top features based on the number of features used in the model
+        st.write("select top features")
         num_features_in_shap = shap_values.shape[1]  # Get the number of features from SHAP values
         num_top_features = min(5, num_features_in_shap)  # Use as many features as possible, up to 5
         top_features_for_shap = selected_features[:num_top_features]
+        st.write("shap init")
 
         shap.initjs()
         shap.summary_plot(shap_values, X_test, feature_names=top_features_for_shap, max_display=num_top_features, plot_type="bar")
