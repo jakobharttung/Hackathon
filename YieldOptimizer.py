@@ -11,17 +11,24 @@ import numpy as np
 # Set page title
 st.title('Yield Optimization Dashboard')
 
+# Function to clean and validate data
+def clean_and_validate_data(df, yield_column, features):
+    # Convert yield column to numeric, invalid parsing will result in NaN
+    df[yield_column] = pd.to_numeric(df[yield_column], errors='coerce')
+    
+    # Convert feature columns to numeric, invalid parsing will result in NaN
+    df[features] = df[features].apply(pd.to_numeric, errors='coerce')
+    
+    # Drop rows where yield or any selected features have NaN values
+    df_cleaned = df.dropna(subset=[yield_column] + features)
+    
+    return df_cleaned
+
 # Function to prepare the features for the model
 def prepare_features(df, features, yield_column):
-    # Ensure only numeric columns are passed for features
-    df[features] = df[features].apply(pd.to_numeric, errors='coerce')  # Convert to numeric, coerce invalids to NaN
-    df[yield_column] = pd.to_numeric(df[yield_column], errors='coerce')  # Ensure yield column is numeric
-    
-    # Drop rows with NaN values in the selected features and yield column
-    df_cleaned = df.dropna(subset=features + [yield_column])
-    
-    X = df_cleaned[features]  # Features
-    y = df_cleaned[yield_column]  # Target
+    # Prepare the cleaned dataset for machine learning
+    X = df[features]  # Features
+    y = df[yield_column]  # Target
     
     return X, y
 
@@ -62,29 +69,37 @@ if uploaded_file is not None:
     numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
     features = st.sidebar.multiselect("Select Features to Analyze", numeric_columns, default=numeric_columns)
 
+    # --- Data Cleansing and Validation ---
+    df_cleaned = clean_and_validate_data(df, yield_column, features)
+    
+    # If the dataset is empty after cleansing, show an error
+    if df_cleaned.empty:
+        st.error("No valid data available after cleaning. Please check the dataset and try again.")
+        st.stop()
+
     # --- Visualization ---
     st.write("### Yield Distribution")
     fig, ax = plt.subplots()
-    sns.histplot(df[yield_column], kde=True, ax=ax)
+    sns.histplot(df_cleaned[yield_column], kde=True, ax=ax)
     ax.set_title('Yield Distribution')
     st.pyplot(fig)
 
     # --- Variability in Yield using Scatter Plot with Months and Custom Y Axis ---
     st.write("### Variability in Yield")
-    if 'manufacture_date' in df.columns:
+    if 'manufacture_date' in df_cleaned.columns:
         fig, ax = plt.subplots()
 
         # Scatter plot with month on x-axis and yield on y-axis
-        df['month_numeric'] = df['manufacture_date'].dt.month  # Extract month as a number for better plotting
-        ax.scatter(df['month_numeric'], df[yield_column])
+        df_cleaned['month_numeric'] = df_cleaned['manufacture_date'].dt.month  # Extract month as a number for better plotting
+        ax.scatter(df_cleaned['month_numeric'], df_cleaned[yield_column])
 
         # Customize the x-axis to show only months
         ax.set_xticks(range(1, 13))
         ax.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
 
         # Set custom y-axis limits to focus on central range of yield values
-        lower_bound = df[yield_column].quantile(0.05)  # 5th percentile
-        upper_bound = df[yield_column].quantile(0.95)  # 95th percentile
+        lower_bound = df_cleaned[yield_column].quantile(0.05)  # 5th percentile
+        upper_bound = df_cleaned[yield_column].quantile(0.95)  # 95th percentile
         ax.set_ylim([lower_bound, upper_bound])  # Set y-axis limits
 
         ax.set_xlabel('Month')
@@ -97,7 +112,7 @@ if uploaded_file is not None:
     # --- Correlation Matrix ---
     st.write("### Correlation Matrix")
     fig, ax = plt.subplots(figsize=(10,8))
-    corr_matrix = df[features + [yield_column]].corr()
+    corr_matrix = df_cleaned[features + [yield_column]].corr()
     sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', ax=ax)
     st.pyplot(fig)
 
@@ -105,7 +120,7 @@ if uploaded_file is not None:
     st.write("### Machine Learning: Yield Prediction")
     
     # Prepare the features and target variable using the custom function
-    X, y = prepare_features(df, features, yield_column)
+    X, y = prepare_features(df_cleaned, features, yield_column)
 
     # Split data into train and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
