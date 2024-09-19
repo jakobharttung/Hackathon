@@ -158,7 +158,7 @@ if uploaded_file is not None:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(X_test)
 
-        # Dynamically select top features based on availability
+        # Dynamically select top features based on the number of features used in the model
         num_top_features = min(5, len(selected_features))  # Use as many features as possible, up to 5
         top_features_for_shap = selected_features[:num_top_features]
 
