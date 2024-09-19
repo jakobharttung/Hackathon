@@ -24,7 +24,7 @@ def clean_and_validate_data(df, yield_column):
 # Function to select and clean features for machine learning
 def select_and_clean_features(df):
     # Select columns between 'campaign_id' and 'fet_3_1a_initial_ph'
-    feature_columns = df.loc[:, 'quantity':'fet_3_1a_initial_ph']
+    feature_columns = df.loc[:, 'campaign_id':'fet_3_1a_initial_ph']
 
     # Drop columns with non-numeric values or only one unique value
     numeric_features = feature_columns.apply(pd.to_numeric, errors='coerce')
@@ -109,8 +109,9 @@ if uploaded_file is not None:
 
     # --- Correlation Matrix ---
     st.write("### Correlation Matrix")
+    top_features_for_corr = selected_features[:10] + [yield_column]  # Select top 10 features and yield_value for correlation matrix
     fig, ax = plt.subplots(figsize=(10,8))
-    corr_matrix = df_cleaned[selected_features + [yield_column]].corr()  # Include yield_value in the correlation matrix
+    corr_matrix = df_cleaned[top_features_for_corr].corr()
     sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', ax=ax)
     st.pyplot(fig)
 
@@ -137,9 +138,9 @@ if uploaded_file is not None:
     st.write(f"R² Score: {r2:.4f}")
 
     # --- Feature Importance ---
-    top_features_for_importance = selected_features[:10]  # Limit to top 10 features for readability
     st.write("### Feature Importance (Top 10 Features)")
-    feature_importance = pd.DataFrame({'Feature': top_features_for_importance, 'Importance': model.feature_importances_})
+    top_features_for_importance = selected_features[:10]  # Limit to top 10 features for readability
+    feature_importance = pd.DataFrame({'Feature': top_features_for_importance, 'Importance': model.feature_importances_[:10]})
     feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
 
     fig, ax = plt.subplots()
@@ -158,7 +159,7 @@ if uploaded_file is not None:
         shap_values = explainer.shap_values(X_test)
 
         shap.initjs()
-        shap.summary_plot(shap_values, X_test, feature_names=selected_features, max_display=5, plot_type="bar")
+        shap.summary_plot(shap_values, X_test, feature_names=selected_features[:5], max_display=5, plot_type="bar")
         st.pyplot(bbox_inches='tight')
 
         # Suggest optimal ranges for the top 5 features
