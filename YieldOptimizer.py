@@ -27,6 +27,7 @@ if uploaded_file is not None:
     if 'manufacture_date' in df.columns:
         try:
             df['manufacture_date'] = pd.to_datetime(df['manufacture_date'], errors='coerce')
+            df['month'] = df['manufacture_date'].dt.strftime('%b')  # Extract month name
         except Exception as e:
             st.warning("Error converting 'manufacture_date' to datetime")
 
@@ -53,14 +54,25 @@ if uploaded_file is not None:
     ax.set_title('Yield Distribution')
     st.pyplot(fig)
 
-    # --- Variability in Yield using Scatter Plot ---
+    # --- Variability in Yield using Scatter Plot with Months and Custom Y Axis ---
     st.write("### Variability in Yield")
     if 'manufacture_date' in df.columns:
         fig, ax = plt.subplots()
-        ax.scatter(df['manufacture_date'], df[yield_column])
-        ax.set_xlabel('Manufacture Date')
+
+        # Scatter plot with month on x-axis and yield on y-axis
+        df['month_numeric'] = df['manufacture_date'].dt.month  # Extract month as a number for better plotting
+        ax.scatter(df['month_numeric'], df[yield_column])
+
+        # Customize the x-axis to show only months
+        ax.set_xticks(range(1, 13))
+        ax.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
+
+        # Set custom y-axis with about 10 sub-steps
+        ax.set_yticks([round(i, 2) for i in plt.MaxNLocator(10).tick_values(df[yield_column].min(), df[yield_column].max())])
+        
+        ax.set_xlabel('Month')
         ax.set_ylabel('Yield')
-        ax.set_title('Yield Variability Over Time')
+        ax.set_title('Yield Variability Over Months')
         st.pyplot(fig)
     else:
         st.warning("Manufacture Date column is not available for plotting")
@@ -75,8 +87,13 @@ if uploaded_file is not None:
     # --- Machine Learning Model ---
     st.write("### Machine Learning: Yield Prediction")
     
-    X = df[features]
-    y = df[yield_column]
+    # Ensure only numeric columns are used for training the model
+    X = df[features].apply(pd.to_numeric, errors='coerce')  # Convert columns to numeric, invalid parsing will be NaN
+    y = df[yield_column].apply(pd.to_numeric, errors='coerce')  # Ensure the target column is numeric
+
+    # Drop rows with NaN values resulting from invalid conversions
+    X = X.dropna()
+    y = y[X.index]  # Ensure target variable has the same index as features
 
     # Split data into train and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
