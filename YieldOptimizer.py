@@ -159,7 +159,8 @@ if uploaded_file is not None:
         shap_values = explainer.shap_values(X_test)
 
         # Dynamically select top features based on the number of features used in the model
-        num_top_features = min(5, len(selected_features))  # Use as many features as possible, up to 5
+        num_features_in_shap = shap_values.shape[1]  # Get the number of features from SHAP values
+        num_top_features = min(5, num_features_in_shap)  # Use as many features as possible, up to 5
         top_features_for_shap = selected_features[:num_top_features]
 
         shap.initjs()
