@@ -38,12 +38,9 @@ def select_and_clean_features(df):
     return numeric_features.columns.tolist()
 
 # Function to prepare features for machine learning
-def prepare_features(df, selected_features, yield_column, manufacture_date_column):
-    # Convert manufacture date to numeric timestamp (to be used as a feature)
-    df[manufacture_date_column] = df[manufacture_date_column].apply(lambda x: x.timestamp())
-
-    # Prepare the cleaned dataset for machine learning (excluding yield_value)
-    X = df[selected_features + [manufacture_date_column]]  # Features + manufacture date
+def prepare_features(df, selected_features, yield_column):
+        # Prepare the cleaned dataset for machine learning (excluding yield_value)
+    X = df[selected_features ]  # Features 
     y = df[yield_column]  # Target
     
     return X, y
@@ -127,7 +124,7 @@ if uploaded_file is not None:
     st.write("### Machine Learning: Yield Prediction")
     
     # Prepare features for machine learning, including manufacture date
-    X, y = prepare_features(df_cleaned, selected_features, yield_column, manufacture_date_column)
+    X, y = prepare_features(df_cleaned, selected_features, yield_column)
 
     # Split data into train and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
