@@ -4,3 +4,4 @@ seaborn
 streamlit
 scikit-learn
 shap
+ipython
