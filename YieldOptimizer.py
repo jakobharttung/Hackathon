@@ -15,9 +15,15 @@ st.sidebar.title("Upload CSV Dataset")
 uploaded_file = st.sidebar.file_uploader("Choose a CSV file", type=["csv"])
 
 if uploaded_file is not None:
-    # Load dataset
-    df = pd.read_csv(uploaded_file)
-    
+    # Read the CSV file into a pandas DataFrame
+    try:
+        df = pd.read_csv(uploaded_file)
+        st.success("File uploaded successfully!")
+    except Exception as e:
+        st.error(f"Error reading CSV file: {e}")
+        st.stop()
+
+    # Show a preview of the dataset
     st.write("### Dataset Preview")
     st.dataframe(df.head())
 
@@ -103,6 +109,4 @@ if uploaded_file is not None:
         st.write(f"**{feature}:** Adjust the range between X and Y (replace X and Y with specific values from analysis) to potentially increase yield by Z%.")
 
 else:
-    st.write("Upload a dataset to begin analysis.")
-
-
+    st.write("Please upload a dataset to begin analysis.")
