@@ -6,6 +6,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import shap
+import numpy as np
 
 # Set page title
 st.title('Yield Optimization Dashboard')
@@ -81,9 +82,11 @@ if uploaded_file is not None:
         ax.set_xticks(range(1, 13))
         ax.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
 
-        # Set custom y-axis with about 10 sub-steps
-        ax.set_yticks([round(i, 2) for i in plt.MaxNLocator(10).tick_values(df[yield_column].min(), df[yield_column].max())])
-        
+        # Set custom y-axis limits to focus on central range of yield values
+        lower_bound = df[yield_column].quantile(0.05)  # 5th percentile
+        upper_bound = df[yield_column].quantile(0.95)  # 95th percentile
+        ax.set_ylim([lower_bound, upper_bound])  # Set y-axis limits
+
         ax.set_xlabel('Month')
         ax.set_ylabel('Yield')
         ax.set_title('Yield Variability Over Months')
@@ -133,12 +136,18 @@ if uploaded_file is not None:
     # --- SHAP values for interpretability ---
     st.write("### SHAP Analysis (Top 5 Features)")
     
-    explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(X_test)
+    try:
+        # Ensure SHAP values are calculated for strictly numeric input
+        X_test = X_test.astype(np.float64)
 
-    shap.initjs()
-    shap.summary_plot(shap_values, X_test, feature_names=features, max_display=5, plot_type="bar")
-    st.pyplot(bbox_inches='tight')
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(X_test)
+
+        shap.initjs()
+        shap.summary_plot(shap_values, X_test, feature_names=features, max_display=5, plot_type="bar")
+        st.pyplot(bbox_inches='tight')
+    except Exception as e:
+        st.error(f"Error generating SHAP values: {e}")
 
     # --- Parameter Optimization ---
     st.write("### Suggested Parameter Ranges for Yield Improvement")
