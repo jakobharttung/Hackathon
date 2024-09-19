@@ -12,22 +12,25 @@ import numpy as np
 st.title('Yield Optimization Dashboard')
 
 # Function to clean and validate data
-def clean_and_validate_data(df, yield_column, features):
-    # Convert yield column to numeric, invalid parsing will result in NaN
+def clean_and_validate_data(df, yield_column, manufacture_date_column):
+    # Ensure that the yield column is numeric
     df[yield_column] = pd.to_numeric(df[yield_column], errors='coerce')
     
-    # Convert feature columns to numeric, invalid parsing will result in NaN
-    df[features] = df[features].apply(pd.to_numeric, errors='coerce')
-    
-    # Drop rows where yield or any selected features have NaN values
-    df_cleaned = df.dropna(subset=[yield_column] + features)
+    # Convert manufacture date to datetime
+    df[manufacture_date_column] = pd.to_datetime(df[manufacture_date_column], errors='coerce')
+
+    # Drop rows where yield or manufacture date is NaN
+    df_cleaned = df.dropna(subset=[yield_column, manufacture_date_column])
     
     return df_cleaned
 
-# Function to prepare the features for the model
-def prepare_features(df, features, yield_column):
+# Function to prepare features for machine learning
+def prepare_features(df, features, yield_column, manufacture_date_column):
+    # Convert manufacture date to numeric timestamp (to be used as a feature)
+    df[manufacture_date_column] = df[manufacture_date_column].apply(lambda x: x.timestamp())
+
     # Prepare the cleaned dataset for machine learning
-    X = df[features]  # Features
+    X = df[features + [manufacture_date_column]]  # Features + manufacture date
     y = df[yield_column]  # Target
     
     return X, y
@@ -45,37 +48,30 @@ if uploaded_file is not None:
         st.error(f"Error reading CSV file: {e}")
         st.stop()
 
-    # Convert manufacture_date to datetime if it exists in the dataset
-    if 'manufacture_date' in df.columns:
-        try:
-            df['manufacture_date'] = pd.to_datetime(df['manufacture_date'], errors='coerce')
-            df['month'] = df['manufacture_date'].dt.strftime('%b')  # Extract month name
-        except Exception as e:
-            st.warning("Error converting 'manufacture_date' to datetime")
-
-    # Show a preview of the dataset
-    st.write("### Dataset Preview")
-    st.dataframe(df.head())
-
-    # --- Data Overview ---
-    st.write("### Data Overview")
-    st.write(f"Total records: {df.shape[0]}")
-    st.write(f"Total features: {df.shape[1]}")
-
     # Select yield column and features to analyze
     yield_column = st.sidebar.selectbox("Select Yield Column", df.columns)
-    
-    # Filter numeric features for machine learning
-    numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
-    features = st.sidebar.multiselect("Select Features to Analyze", numeric_columns, default=numeric_columns)
+    manufacture_date_column = 'manufacture_date'  # Assuming manufacture_date is the correct column name
 
-    # --- Data Cleansing and Validation ---
-    df_cleaned = clean_and_validate_data(df, yield_column, features)
+    # Clean and validate data
+    df_cleaned = clean_and_validate_data(df, yield_column, manufacture_date_column)
     
     # If the dataset is empty after cleansing, show an error
     if df_cleaned.empty:
         st.error("No valid data available after cleaning. Please check the dataset and try again.")
         st.stop()
+
+    # Display the cleaned dataset
+    st.write("### Cleaned Dataset Preview")
+    st.dataframe(df_cleaned.head())
+
+    # --- Data Overview ---
+    st.write("### Data Overview")
+    st.write(f"Total records: {df_cleaned.shape[0]}")
+    st.write(f"Total features: {df_cleaned.shape[1]}")
+
+    # Filter numeric features for machine learning
+    numeric_columns = df_cleaned.select_dtypes(include=['float64', 'int64']).columns
+    features = st.sidebar.multiselect("Select Features to Analyze", numeric_columns, default=numeric_columns)
 
     # --- Visualization ---
     st.write("### Yield Distribution")
@@ -84,30 +80,25 @@ if uploaded_file is not None:
     ax.set_title('Yield Distribution')
     st.pyplot(fig)
 
-    # --- Variability in Yield using Scatter Plot with Months and Custom Y Axis ---
+    # --- Variability in Yield using Scatter Plot with Months ---
     st.write("### Variability in Yield")
-    if 'manufacture_date' in df_cleaned.columns:
-        fig, ax = plt.subplots()
+    fig, ax = plt.subplots()
+    df_cleaned['month'] = df_cleaned[manufacture_date_column].dt.month  # Extract month as a number
+    ax.scatter(df_cleaned['month'], df_cleaned[yield_column])
 
-        # Scatter plot with month on x-axis and yield on y-axis
-        df_cleaned['month_numeric'] = df_cleaned['manufacture_date'].dt.month  # Extract month as a number for better plotting
-        ax.scatter(df_cleaned['month_numeric'], df_cleaned[yield_column])
+    # Customize the x-axis to show only months
+    ax.set_xticks(range(1, 13))
+    ax.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
 
-        # Customize the x-axis to show only months
-        ax.set_xticks(range(1, 13))
-        ax.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
+    # Set custom y-axis limits
+    lower_bound = df_cleaned[yield_column].quantile(0.05)  # 5th percentile
+    upper_bound = df_cleaned[yield_column].quantile(0.95)  # 95th percentile
+    ax.set_ylim([lower_bound, upper_bound])  # Set y-axis limits
 
-        # Set custom y-axis limits to focus on central range of yield values
-        lower_bound = df_cleaned[yield_column].quantile(0.05)  # 5th percentile
-        upper_bound = df_cleaned[yield_column].quantile(0.95)  # 95th percentile
-        ax.set_ylim([lower_bound, upper_bound])  # Set y-axis limits
-
-        ax.set_xlabel('Month')
-        ax.set_ylabel('Yield')
-        ax.set_title('Yield Variability Over Months')
-        st.pyplot(fig)
-    else:
-        st.warning("Manufacture Date column is not available for plotting")
+    ax.set_xlabel('Month')
+    ax.set_ylabel('Yield')
+    ax.set_title('Yield Variability Over Months')
+    st.pyplot(fig)
 
     # --- Correlation Matrix ---
     st.write("### Correlation Matrix")
@@ -119,8 +110,8 @@ if uploaded_file is not None:
     # --- Machine Learning Model ---
     st.write("### Machine Learning: Yield Prediction")
     
-    # Prepare the features and target variable using the custom function
-    X, y = prepare_features(df_cleaned, features, yield_column)
+    # Prepare features for machine learning, including manufacture date
+    X, y = prepare_features(df_cleaned, features, yield_column, manufacture_date_column)
 
     # Split data into train and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -140,7 +131,7 @@ if uploaded_file is not None:
 
     # --- Feature Importance ---
     st.write("### Feature Importance")
-    feature_importance = pd.DataFrame({'Feature': features, 'Importance': model.feature_importances_})
+    feature_importance = pd.DataFrame({'Feature': features + [manufacture_date_column], 'Importance': model.feature_importances_})
     feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
 
     fig, ax = plt.subplots()
@@ -159,7 +150,7 @@ if uploaded_file is not None:
         shap_values = explainer.shap_values(X_test)
 
         shap.initjs()
-        shap.summary_plot(shap_values, X_test, feature_names=features, max_display=5, plot_type="bar")
+        shap.summary_plot(shap_values, X_test, feature_names=features + [manufacture_date_column], max_display=5, plot_type="bar")
         st.pyplot(bbox_inches='tight')
     except Exception as e:
         st.error(f"Error generating SHAP values: {e}")
