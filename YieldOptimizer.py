@@ -28,7 +28,7 @@ def clean_and_validate_data(df, yield_column, manufacture_date_column):
 # Function to select and clean features for machine learning
 def select_and_clean_features(df):
     # Select columns between 'quantity' and 'fet_3_1a_initial_ph'
-    feature_columns = df.loc[:, 'quantity':'fet_3_1a_initial_ph']
+    feature_columns = df.loc[:, 'campaign_id':'fet_3_1a_initial_ph']
 
     # Drop columns with non-numeric values or only one unique value
     numeric_features = feature_columns.apply(pd.to_numeric, errors='coerce')
